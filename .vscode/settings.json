@@ -1,6 +1,0 @@
-{
-  "editor.codeActionsOnSave": {
-    "source.organizeImports": false // Uncomment to sort imports.
-  },
-  "editor.formatOnSave": false
-}
