@@ -4,7 +4,13 @@ export type Backend = {
    * A function that returns a variant index for a specific experiment.
    * This function should call out to your AB test provider and fetch an experiment index
    */
-  getVariant: (experimentId: string) => Promise<number>
+  getVariant: (experimentId: string) => Promise<number>;
+  
+  /**
+   * When SSR is enabled, this will be called on the client.
+   * This is useful for manually setting a variant
+   */
+  setVariant?: (experimentId: string, variant: number) => void;
 }
 
 export type Test = {
@@ -24,3 +30,9 @@ export type Test = {
    */
   testingId?: number
 }
+
+/**
+ * An object container SSR data
+ * The key is the 'name'
+ */
+export type SSRData = Record<string, number>;

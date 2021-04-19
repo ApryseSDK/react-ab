@@ -1,8 +1,22 @@
-import { queryToObject } from './util';
-import { Test, Backend } from './types';
+import { getRandomVariantIndex, queryToObject } from './util';
+import { Test, Backend, SSRData } from './types';
+import Cookies from 'js-cookie'
+import type { IncomingMessage } from 'http'
+
+type Cookies = { [key: string]: string; } 
 
 type RegisteredTest = Test & {
   selectedVariant: number | undefined,
+}
+
+const COOKIE_PREFIX = `_pdftron_react_ab_`;
+
+const getCookieName = (name: string) => `${COOKIE_PREFIX}${name}`;
+
+const isServer = () => typeof window === 'undefined';
+
+type ExperimentsOptions = {
+  enableSSR?: boolean;
 }
 
 class ABServiceClass {
@@ -11,9 +25,11 @@ class ABServiceClass {
   private _disabled: boolean;
   private _log: boolean;
   private _timeout: number;
+  public ssrEnabled: boolean;
 
   constructor() {
     this.cleanState();
+    this.ssrEnabled = false;
   }
 
   // For testing
@@ -22,6 +38,64 @@ class ABServiceClass {
     this._disabled = false;
     this._log = false;
     this._timeout = 1500;
+  }
+
+  /**
+   * Checks cookies for any variants loaded on the server
+   */
+  hydrate() {
+    // only hydrate the client
+    if (!isServer()) {
+      return;
+    }
+    const names = Object.keys(this._experiments);
+    for (const name of names) {
+      const cookieName = getCookieName(name);
+      const value = Cookies.get(cookieName);
+      if (value !== undefined) {
+        const castedValue = Number(value);
+        this.setSelectedIndex(name, castedValue);
+        this.log(`(SSR) Hydrating client - Selected variant ${castedValue} for ${name} via cookie`)
+      } else {
+        this.log(`(SSR) Hydrating client - No cookie found for ${name}`);
+      }
+    }
+  }
+
+  getSSRVariants(cookies: Cookies, setCookie: (name: string, value: number) => void): SSRData {
+    if (!isServer()) {
+      throw new Error(`'getSSRVariants' cannot be called on the client.`)
+    }
+
+    if (!this.ssrEnabled) {
+      throw new Error(`SSR is not enabled. Please pass '{ enableSSR: true }' to the second param of 'registerExperiments' to enable SSR.`)
+    }
+
+    const names = Object.keys(this._experiments);
+
+    return names.reduce((acc, name) => {
+      const experiment = this._experiments[name];
+      // if disabled, just use default (0)
+      if (this._disabled) {
+        acc[name] = 0;
+        this.log(`(SSR) Defaulting to variant 0 for ${name} - AB testing is disabled`);
+      } else {
+        const cookieName = getCookieName(name);
+        const cookieValue = cookies[cookieName];
+        // if a cookie is set use that value
+        // otherwise we generate a new value and store it as a cookie using their callback
+        if (typeof cookieValue !== 'undefined') {
+          acc[name] = Number(cookieValue);
+          this.log(`(SSR) Selecting variant ${cookieValue} for ${name} - via cookie`);
+        } else {
+          const randomValue = getRandomVariantIndex(experiment.variantCount)
+          acc[name] = randomValue;
+          setCookie(cookieName, randomValue);
+          this.log(`(SSR) No cookie found for ${name} - selecting variant ${cookieValue} and storing in cookie`);
+        }   
+      }
+      return acc;
+    }, {})
   }
 
   /**
@@ -48,14 +122,20 @@ class ABServiceClass {
    * 
    * The name of each test is passed to the ABTest component. 
    */
-  registerExperiments(experiments: Record<string, Test>) {
+  registerExperiments(experiments: Record<string, Test>, options: ExperimentsOptions = {}) {
     this._experiments = Object.keys(experiments).reduce((acc, name) => {
       acc[name] = {
         ...experiments[name],
         selectedVariant: undefined
       }
       return acc;
-    }, this._experiments)
+    }, this._experiments);
+
+    if (options.enableSSR) {
+      this.log(`(SSR) - SSR is enabled`);
+      this.ssrEnabled = true;
+      this.hydrate();
+    }
   }
 
   /**
@@ -65,7 +145,7 @@ class ABServiceClass {
     this._log = true;
   }
 
-  private log(string: string) {
+  log(string: string) {
     if (this._log) {
       console.log(string)
     }

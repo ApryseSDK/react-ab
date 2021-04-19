@@ -1,6 +1,6 @@
 import React from 'react';
 import { useContext, useEffect, useRef, useState } from 'react'
-import { BackendContext } from '../context';
+import { BackendContext, SSRContext } from '../context';
 import { ABService } from '../service';
 import { VariantProps } from './Variant';
 
@@ -29,10 +29,15 @@ export const ABTest = ({
   loadingComponent = DefaultPlaceholder
 }: ABTestProps) => {
 
-  const experiment = useRef(ABService.getExperiment(name))
-  const [variant, setVariant] = useState(experiment.current.selectedVariant);
-  const backend = useContext(BackendContext);
+  const experiment = useRef(ABService.getExperiment(name));
 
+  const ssrVariants = useContext(SSRContext);
+  const selectedSSRVariant = ssrVariants?.[name];
+  const isSSREnabled = typeof selectedSSRVariant === 'number';
+
+  const [variant, setVariant] = useState(isSSREnabled ? selectedSSRVariant : experiment.current.selectedVariant);
+  const backend = useContext(BackendContext);
+  
   const loading = typeof variant !== 'number';
 
   useEffect(() => {
@@ -58,16 +63,21 @@ export const ABTest = ({
       throw new Error(`Experiment ${id} has an incorrect number of variants. Expected ${variantCount} but got ${actualVariantCount}`)
     }
 
+    if (ABService.ssrEnabled && typeof variant === 'number') {
+      ABService.log(`(SSR) Setting variant for ${name} (${experiment.current.id}) to ${variant}`);
+      backend?.setVariant(experiment.current.id, variant);
+    }
+
     if (typeof variant !== 'number') {
       go();
     }
   }, [])
 
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' && !isSSREnabled) {
     return <>{loadingComponent}</>
   }
 
-  if (loading) {
+  if (loading && !isSSREnabled) {
     return <>{loadingComponent}</>
   }
 

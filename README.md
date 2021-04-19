@@ -9,6 +9,7 @@ AB testing tools for React projects.
 - 🔰 Easy to use API and [React components](#components)
 - ⚠️ [Robust error handling](#error-handling) and fallback cases
 - 🚦[Variant forcing](#forcing-variants) for testing and debugging
+- 📟 SSR support
 - 💥 Much more!
 
 ## Table of contents
@@ -30,6 +31,7 @@ AB testing tools for React projects.
   - [Testing & Debugging](#testing)
     - [Forcing variants](#forcing-variants)
     - [Logging](#enable-logging)
+  - [SSR](#ssr)
 
 ## Installation
 
@@ -130,11 +132,14 @@ A backend must satisfy the following interface:
 
 ```ts
 type Backend = {
-  getVariant: (experimentId: string) => Promise<number>
+  getVariant: (experimentId: string) => Promise<number>;
+  setVariant?: (experimentId: string, variant: number) => void;
 }
 ```
 
 The `getVariant` function accepts an experiment ID, and must return which variant of that experiment to use. This is where you would call your AB providers API to get a variant.
+
+The [`setVariant`](#ssr) function is used for the SSR feature. It is only required if SSR is enabled.
 
 **Example**
 
@@ -142,12 +147,14 @@ This example uses Google Optimize and GTAG to get a variant index, but you could
 
 ```ts
 const GoogleOptimizeBackend = {
-  getVariant: async (experimentId) => {
-    gtag('event', 'optimize.callback', {
-      name: experimentId,
-      callback: (value) => {
-        resolve(Number(value));
-      }
+  getVariant: (experimentId) => {
+    return new Promise(resolve => {
+      gtag('event', 'optimize.callback', {
+        name: experimentId,
+        callback: (value) => {
+          resolve(Number(value));
+        }
+      })
     })
   }
 }
@@ -163,6 +170,7 @@ This is a high level component that must wrap all instances of `ABTest` componen
 
 - **`backend`** ([Backend](#backends)) the backend to use for your experiments
 - **`children`** (ReactNode) React children to render
+- **`ssrVariants`** (Object) See the [SSR Guide](#ssr) for more info
 
 **Example**
 
@@ -401,3 +409,130 @@ import { ABService } from '@pdftron/react-ab';
 
 ABService.enableLogging()
 ```
+
+### SSR
+
+If your application is server rendered, you may want to select and render your variant on the server in order to prevent content flashes when your site loads.
+
+To enable server side rendering, please follow these steps:
+
+1) **Pass `enableSSR` to your `registerExperiments` call**
+
+```js
+import { ABService } from '@pdftron/react-ab';
+
+ABService.registerTests({
+  buttonTest: {
+    id: 'experimentID',
+    variantCount: 2
+  }
+}, {
+  enableSSR: true
+});
+```
+
+2) **Pass a variant map you want to select to the `ABProvider`**
+
+A variant map is just a object where the keys are the experiment name, and the value is the variant you want to select.
+
+We also provide a [utility function](#ssr-utility) to handle this for you if you do not want to implement yourself.
+
+```js
+import { ABService, ABProvider } from '@pdftron/react-ab';
+
+ABService.registerTests({
+  buttonTest: {
+    id: 'experimentID',
+    variantCount: 2
+  }
+}, {
+  enableSSR: true
+});
+
+export const Root = () => {
+  return (
+    <ABProvider 
+      backend={backend}
+      ssrVariants={{
+        buttonTest: 1
+      }}
+    >
+      <App />
+    </ABProvider>
+  )
+}
+```
+
+3) **Add a `setVariant` function to your backend (optional)**
+
+This function is used to report to your AB Testing service which variant you rendered.
+
+Example using Google Optimize:
+```js
+const GoogleOptimizeBackend = {
+  getVariant: (experimentId) => {
+    // getVariant code
+  },
+  setVariant: (experimentId, variant) => {
+    ga('set', 'exp', `${experimentId}.${variant}`);
+  }
+}
+```
+
+
+#### SSR utility
+
+We provide a utility function to generate a variant map for you. It looks at all your registered experiments and outputs a map. It also handles client side hydration and cookies.
+
+**`ABService.getSSRVariants(cookies: Record<string, any>, setCookie: (name: string, value: number) => void)`**
+
+Params:
+
+- **`cookies`** (object) A map of cookies in the request. Used for making sure the user always sees the same variants
+- **`setCookie`** (function) A function that is called whenever a new cookie is generated and needs to be set. It is passed the cookie name and the cookie value.
+
+Returns a map of cookies names -> variant indexes.
+
+**Example (in the context of Next.js):**
+
+```js
+import { ABService, ABProvider } from '@pdftron/react-ab';
+
+ABService.registerTests({
+  buttonTest: {
+    id: 'experimentID',
+    variantCount: 2
+  }
+}, {
+  enableSSR: true
+});
+
+export const Root = ({ variants }) => {
+  return (
+    <ABProvider 
+      backend={backend}
+      ssrVariants={variants}
+    >
+      <App />
+    </ABProvider>
+  )
+}
+
+export const getServerSideProps = async (context) => {
+  const variants = ABService.getSSRVariants(
+    context.req.cookies,
+    (name, value) => {
+      context.req.cookies.set(name, value)
+    }
+  )
+  return {
+    props: {
+      variants
+    },
+  };
+};
+```
+
+
+
+
