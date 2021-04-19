@@ -41,7 +41,7 @@ export const useExperiment = (name: string) => {
       ABService.log(`(SSR) Setting variant for ${name} (${experiment.id}) to ${variant}`);
       backend?.setVariant(experiment.id, variant);
     }
-  }, [experiment, variant, name])
+  }, [backend, experiment, variant, name])
 
   return {
     variant,
