@@ -132,11 +132,14 @@ A backend must satisfy the following interface:
 
 ```ts
 type Backend = {
-  getVariant: (experimentId: string) => Promise<number>
+  getVariant: (experimentId: string) => Promise<number>;
+  setVariant?: (experimentId: string, variant: number) => void;
 }
 ```
 
 The `getVariant` function accepts an experiment ID, and must return which variant of that experiment to use. This is where you would call your AB providers API to get a variant.
+
+The [`setVariant`](#ssr) function is used for the SSR feature. It is only required if SSR is enabled.
 
 **Example**
 
@@ -144,12 +147,14 @@ This example uses Google Optimize and GTAG to get a variant index, but you could
 
 ```ts
 const GoogleOptimizeBackend = {
-  getVariant: async (experimentId) => {
-    gtag('event', 'optimize.callback', {
-      name: experimentId,
-      callback: (value) => {
-        resolve(Number(value));
-      }
+  getVariant: (experimentId) => {
+    return new Promise(resolve => {
+      gtag('event', 'optimize.callback', {
+        name: experimentId,
+        callback: (value) => {
+          resolve(Number(value));
+        }
+      })
     })
   }
 }
@@ -165,6 +170,7 @@ This is a high level component that must wrap all instances of `ABTest` componen
 
 - **`backend`** ([Backend](#backends)) the backend to use for your experiments
 - **`children`** (ReactNode) React children to render
+- **`ssrVariants`** (Object) See the [SSR Guide](#ssr) for more info
 
 **Example**
 
