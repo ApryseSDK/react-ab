@@ -1,39 +1,45 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { BackendContext, SSRContext } from "../context";
 import { ABService } from "../service";
 
-export const useExperiment = (name: string): [number, boolean] => {
-  const experiment = useRef(ABService.getExperiment(name));
-
+export const useExperiment = (name: string) => {
   const ssr = useContext(SSRContext);
   const backend = useContext(BackendContext);
 
-  const selectedSSRVariant = ssr?.[name];
-  const isSSREnabled = typeof selectedSSRVariant === "number";
+  const experiment = useMemo(() => ABService.getExperiment(name), [name]);
 
-  const [variant, setVariant] = useState(isSSREnabled ? selectedSSRVariant : experiment.current.selectedVariant);
+  const [variant, setVariant] = useState(() => {
+    const selectedSSRVariant = ssr?.[name];
+    const isSSREnabled = typeof selectedSSRVariant === "number";
+    return isSSREnabled ? selectedSSRVariant : experiment.selectedVariant;
+  });
+
   const [loading, setLoading] = useState(typeof variant !== "number");
-  useEffect(() => {
-    setLoading(typeof variant !== "number");
-  }, [variant]);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const { id } = experiment.current;
-    const go = async () => {
-      const experimentIndex = await ABService.loadVariant(backend, experiment.current, id);
-      setVariant(experimentIndex);
-      ABService.setSelectedIndex(name, experimentIndex);
-    };
+  const getClientSide = useCallback(async () => {
+    setLoading(true);
 
-    if (ABService.ssrEnabled && typeof variant === "number") {
-      ABService.log(`(SSR) Setting variant for ${name} (${experiment.current.id}) to ${variant}`);
-      backend?.setVariant(experiment.current.id, variant);
+    try {
+      const variantIndex = await ABService.loadVariant(backend, experiment, experiment.id);
+      setVariant(variantIndex);
+      setError(null);
+    } catch (error) {
+      setError(String(error) || "unknown error loading variant");
     }
 
-    if (typeof variant !== "number") {
-      go();
-    }
-  }, []);
+    setLoading(false);
+  }, [backend, experiment]);
 
-  return [variant, loading];
+  useEffect(() => {
+    if (!loading) return;
+    getClientSide();
+  }, [loading, experiment]);
+
+  return {
+    variant,
+    loading,
+    error,
+    getClientSide,
+  };
 };
