@@ -36,6 +36,13 @@ export const useExperiment = (name: string) => {
     getClientSide();
   }, [loading, experiment]);
 
+  useEffect(() => {
+    if (ABService.ssrEnabled && typeof variant === 'number') {
+      ABService.log(`(SSR) Setting variant for ${name} (${experiment.id}) to ${variant}`);
+      backend?.setVariant(experiment.id, variant);
+    }
+  }, [experiment, variant, name])
+
   return {
     variant,
     loading,
