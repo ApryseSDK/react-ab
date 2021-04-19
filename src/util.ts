@@ -33,3 +33,7 @@ export const formatLink = (l: string) => {
   }
   return l;
 }
+
+export const getRandomVariantIndex = (numberOfVariants) => {
+  return Math.floor(Math.random() * numberOfVariants);
+}

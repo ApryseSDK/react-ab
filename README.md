@@ -9,6 +9,7 @@ AB testing tools for React projects.
 - 🔰 Easy to use API and [React components](#components)
 - ⚠️ [Robust error handling](#error-handling) and fallback cases
 - 🚦[Variant forcing](#forcing-variants) for testing and debugging
+- 📟 SSR support
 - 💥 Much more!
 
 ## Table of contents
@@ -30,6 +31,7 @@ AB testing tools for React projects.
   - [Testing & Debugging](#testing)
     - [Forcing variants](#forcing-variants)
     - [Logging](#enable-logging)
+  - [SSR](#ssr)
 
 ## Installation
 
@@ -401,3 +403,113 @@ import { ABService } from '@pdftron/react-ab';
 
 ABService.enableLogging()
 ```
+
+### SSR
+
+If your application is server rendered, you may want to select and render your variant on the server in order to prevent content flashes when your site loads.
+
+To enable server side rendering, please follow these steps:
+
+1) **Pass `enableSSR` to your `registerExperiments` call**
+
+```js
+import { ABService } from '@pdftron/react-ab';
+
+ABService.registerTests({
+  buttonTest: {
+    id: 'experimentID',
+    variantCount: 2
+  }
+}, {
+  enableSSR: true
+});
+```
+
+2) **Pass a variant map you want to select to the `ABProvider`**
+
+A variant map is just a object where the keys are the experiment name, and the value is the variant you want to select.
+
+We also provide a [utility function](#ssr-utility) to handle this for you if you do not want to implement yourself.
+
+```js
+import { ABService, ABProvider } from '@pdftron/react-ab';
+
+ABService.registerTests({
+  buttonTest: {
+    id: 'experimentID',
+    variantCount: 2
+  }
+}, {
+  enableSSR: true
+});
+
+export const Root = () => {
+  return (
+    <ABProvider 
+      backend={backend}
+      ssrVariants={{
+        buttonTest: 1
+      }}
+    >
+      <App />
+    </ABProvider>
+  )
+}
+```
+
+#### SSR utility
+
+We provide a utility function to generate a variant map for you. It looks at all your registered experiments and outputs a map. It also handles client side hydration and cookies.
+
+**`ABService.getSSRVariants(cookies: Record<string, any>, setCookie: (name: string, value: number) => void)`**
+
+Params:
+
+- **`cookies`** (object) A map of cookies in the request. Used for making sure the user always sees the same variants
+- **`setCookie`** (function) A function that is called whenever a new cookie is generated and needs to be set. It is passed the cookie name and the cookie value.
+
+Returns a map of cookies names -> variant indexes.
+
+**Example (in the context of Next.js):**
+
+```js
+import { ABService, ABProvider } from '@pdftron/react-ab';
+
+ABService.registerTests({
+  buttonTest: {
+    id: 'experimentID',
+    variantCount: 2
+  }
+}, {
+  enableSSR: true
+});
+
+export const Root = ({ variants }) => {
+  return (
+    <ABProvider 
+      backend={backend}
+      ssrVariants={variants}
+    >
+      <App />
+    </ABProvider>
+  )
+}
+
+export const getServerSideProps = async (context) => {
+  const variants = ABService.getSSRVariants(
+    context.req.cookies,
+    (name, value) => {
+      context.req.cookies.set(name, value)
+    }
+  )
+  return {
+    props: {
+      variants
+    },
+  };
+};
+```
+
+
+
+
