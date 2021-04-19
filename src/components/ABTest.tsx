@@ -29,10 +29,10 @@ export const ABTest = ({
   name,
   loadingComponent = DefaultPlaceholder
 }: ABTestProps) => {
-  
+
   const experiment = useRef(ABService.getExperiment(name));
 
-  const {variant, loading, isSSREnabled} = useExperiment(name)
+  const {variant, loading, isSSREnabled} = useExperiment(name);
   
   useEffect(() => {
     const { id } = experiment.current;
