@@ -15,7 +15,7 @@ export const ABProvider = ({
   ssrVariants
 }: ABProviderProps) => {
 
-  if (!ABService.ssrEnabled) {
+  if (ssrVariants && !ABService.ssrEnabled) {
     throw new Error(`'SSR' must be enabled to use 'ssrVariants'. See the SSR guides for more info`)
   }
 
