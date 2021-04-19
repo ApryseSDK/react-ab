@@ -9,7 +9,7 @@ AB testing tools for React projects.
 - 🔰 Easy to use API and [React components](#components)
 - ⚠️ [Robust error handling](#error-handling) and fallback cases
 - 🚦[Variant forcing](#forcing-variants) for testing and debugging
-- 📟 SSR support
+- 📟 [SSR support](#ssr)
 - 💥 Much more!
 
 ## Table of contents
