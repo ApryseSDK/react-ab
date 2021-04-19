@@ -64,6 +64,7 @@ export const ABTest = ({
     }
 
     if (ABService.ssrEnabled && typeof variant === 'number') {
+      ABService.log(`(SSR) Setting variant for ${name} (${experiment.current.id}) to ${variant}`);
       backend?.setVariant(experiment.current.id, variant);
     }
 

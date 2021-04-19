@@ -55,6 +55,9 @@ class ABServiceClass {
       if (value !== undefined) {
         const castedValue = Number(value);
         this.setSelectedIndex(name, castedValue);
+        this.log(`(SSR) Hydrating client - Selected variant ${castedValue} for ${name} via cookie`)
+      } else {
+        this.log(`(SSR) Hydrating client - No cookie found for ${name}`);
       }
     }
   }
@@ -75,6 +78,7 @@ class ABServiceClass {
       // if disabled, just use default (0)
       if (this._disabled) {
         acc[name] = 0;
+        this.log(`(SSR) Defaulting to variant 0 for ${name} - AB testing is disabled`);
       } else {
         const cookieName = getCookieName(name);
         const cookieValue = cookies[cookieName];
@@ -82,10 +86,12 @@ class ABServiceClass {
         // otherwise we generate a new value and store it as a cookie using their callback
         if (typeof cookieValue !== 'undefined') {
           acc[name] = Number(cookieValue);
+          this.log(`(SSR) Selecting variant ${cookieValue} for ${name} - via cookie`);
         } else {
           const randomValue = getRandomVariantIndex(experiment.variantCount)
           acc[name] = randomValue;
-          setCookie(cookieName, randomValue)
+          setCookie(cookieName, randomValue);
+          this.log(`(SSR) No cookie found for ${name} - selecting variant ${cookieValue} and storing in cookie`);
         }   
       }
       return acc;
@@ -126,6 +132,7 @@ class ABServiceClass {
     }, this._experiments);
 
     if (options.enableSSR) {
+      this.log(`(SSR) - SSR is enabled`);
       this.ssrEnabled = true;
       this.hydrate();
     }
@@ -138,7 +145,7 @@ class ABServiceClass {
     this._log = true;
   }
 
-  private log(string: string) {
+  log(string: string) {
     if (this._log) {
       console.log(string)
     }

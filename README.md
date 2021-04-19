@@ -463,6 +463,23 @@ export const Root = () => {
 }
 ```
 
+3) **Add a `setVariant` function to your backend (optional)**
+
+This function is used to report to your AB Testing service which variant you rendered.
+
+Example using Google Optimize:
+```js
+const GoogleOptimizeBackend = {
+  getVariant: (experimentId) => {
+    // getVariant code
+  },
+  setVariant: (experimentId, variant) => {
+    ga('set', 'exp', `${experimentId}.${variant}`);
+  }
+}
+```
+
+
 #### SSR utility
 
 We provide a utility function to generate a variant map for you. It looks at all your registered experiments and outputs a map. It also handles client side hydration and cookies.
