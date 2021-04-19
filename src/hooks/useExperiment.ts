@@ -23,13 +23,14 @@ export const useExperiment = (name: string) => {
     try {
       const variantIndex = await ABService.loadVariant(backend, experiment, experiment.id);
       setVariant(variantIndex);
+      ABService.setSelectedIndex(name, variantIndex);
       setError(null);
     } catch (error) {
       setError(String(error) || "unknown error loading variant");
     }
 
     setLoading(false);
-  }, [backend, experiment]);
+  }, [backend, experiment, name]);
 
   useEffect(() => {
     if (!loading) return;
