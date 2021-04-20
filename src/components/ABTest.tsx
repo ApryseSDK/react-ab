@@ -3,6 +3,7 @@ import { useContext, useEffect, useRef, useState } from 'react'
 import { BackendContext, SSRContext } from '../context';
 import { ABService } from '../service';
 import { VariantProps } from './Variant';
+import { useExperiment } from '../hooks/useExperiment';
 
 const DefaultPlaceholder = <></>;
 
@@ -31,47 +32,24 @@ export const ABTest = ({
 
   const experiment = useRef(ABService.getExperiment(name));
 
-  const ssrVariants = useContext(SSRContext);
-  const selectedSSRVariant = ssrVariants?.[name];
-  const isSSREnabled = typeof selectedSSRVariant === 'number';
-
-  const [variant, setVariant] = useState(isSSREnabled ? selectedSSRVariant : experiment.current.selectedVariant);
-  const backend = useContext(BackendContext);
+  const {variant, loading, isSSREnabled} = useExperiment(name);
   
-  const loading = typeof variant !== 'number';
-
   useEffect(() => {
     const { id } = experiment.current;
-    const go = async () => {
-      const experimentIndex = await ABService.loadVariant(backend, experiment.current, id);
-      setVariant(experimentIndex)
-      ABService.setSelectedIndex(name, experimentIndex);
-    }
 
     const { variantCount } = experiment.current;
     const actualVariantCount = children.reduce<number>((acc, child) => {
-      // @ts-ignore
-      const { props } = child;
-      const { variant } = props;
-      if (typeof variant === 'number') {
-        return acc + 1;
+      const { variant } = child.props;
+      if (Array.isArray(variant)) {
+        return acc + variant.length;
       }
-      return acc + (variant as number[]).length;
-    }, 0)
+      return acc + 1;
+    }, 0);
 
     if (actualVariantCount !== variantCount) {
-      throw new Error(`Experiment ${id} has an incorrect number of variants. Expected ${variantCount} but got ${actualVariantCount}`)
+      throw new Error(`Experiment ${id} has an incorrect number of variants. Expected ${variantCount} but got ${actualVariantCount}`);
     }
-
-    if (ABService.ssrEnabled && typeof variant === 'number') {
-      ABService.log(`(SSR) Setting variant for ${name} (${experiment.current.id}) to ${variant}`);
-      backend?.setVariant(experiment.current.id, variant);
-    }
-
-    if (typeof variant !== 'number') {
-      go();
-    }
-  }, [])
+  }, []);
 
   if (typeof window === 'undefined' && !isSSREnabled) {
     return <>{loadingComponent}</>
